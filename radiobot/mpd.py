@@ -34,3 +34,22 @@ class Client:
     def __exit__(self, *args):
         self.close()
         return False
+
+
+class MPDTrack:
+    def __init__(self, status):
+        self.volume = int(status['volume'])
+        self.repeat = bool(int(status['repeat']))
+        self.random = bool(int(status['random']))
+        self.single = bool(int(status['single']))
+        self.consume = bool(int(status['consume']))
+        self.playlist = int(status['playlist'])
+        self.playlist_length = int(status['playlistlength'])
+        self.mix_ramp = float(status['mixrampdb'])
+        self.state = status['state']
+        self.song = bool(int(status['song']))
+        self.song_id = int(status['songid'])
+        self.time = status['time']  # ?
+        self.elapsed = float(status['elapsed'])
+        self.bitrate = int(status['bitrate'])
+        self.format = status['audio']
