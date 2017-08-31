@@ -53,3 +53,8 @@ class MPDTrack:
         self.elapsed = float(status['elapsed'])
         self.bitrate = int(status['bitrate'])
         self.format = status['audio']
+
+    def __eq__(self, other):
+        return all(getattr(self, x) == getattr(other, x)
+                   for x in ['volume',
+                             'song_id'])

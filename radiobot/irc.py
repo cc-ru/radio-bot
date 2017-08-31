@@ -1,4 +1,5 @@
 import ssl as ssllib
+from functools import partial
 
 from irc.bot import SingleServerIRCBot, ExponentialBackoff
 from irc.connection import Factory
@@ -23,7 +24,7 @@ class IRCRadioBot(SingleServerIRCBot):
             super().__init__([server], nickname, realname,
                              recon=self.strategy)
         self.channel = channel
-        self.channel_topic = None
+        self.previous_track = None
         self.nickserv_password = password
         self.nickserv_nick = nickserv_nick or nickname
         self.mpd = mpd_client
@@ -36,6 +37,14 @@ class IRCRadioBot(SingleServerIRCBot):
                                                 self.nickserv_password))
         connection.join(self.channel)
 
+        sekf.reactor.scheduler.execute_every(1, partial(self.update,
+                                                        connection))
+
     def get_current_track(self):
         with self.mpd as mpd:
             return MPDTrack(mpd.status())
+    
+    def update(self, connection):
+        current_track = self.get_current_track()
+        if current_track == self.previous_track:
+            pass
