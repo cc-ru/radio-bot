@@ -42,9 +42,30 @@ class IRCRadioBot(SingleServerIRCBot):
 
     def get_current_track(self):
         with self.mpd as mpd:
-            return MPDTrack(mpd.status())
+            return MPDTrack(mpd.status(), mpd.currentsong())
     
     def update(self, connection):
         current_track = self.get_current_track()
-        if current_track == self.previous_track:
-            pass
+
+        if current_track != self.previous_track:
+            topic = 'Playing: ' + str(current_track)
+            connection.topic(self.channel, topic)
+
+            connection.privmsg(
+                self.channel,
+                '\x02Now playing:\x02 [{name}] {artist} — {title}'.format(
+                    name=current_track.name,
+                    artist=current_track.artist,
+                    title=current_track.title
+                )
+            )
+            connection.privmsg(
+                self.channel,
+                '\x02Album:\x02 {album}'.format(album=current_track.album)
+            )
+            connection.privmsg(
+                self.channel,
+                '\x02Genre:\x02 {genre}, \x02volume\x02: {volume}'
+            )
+
+        self.previous_track = current_track

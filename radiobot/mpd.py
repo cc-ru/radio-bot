@@ -37,7 +37,7 @@ class Client:
 
 
 class MPDTrack:
-    def __init__(self, status):
+    def __init__(self, status, current):
         self.volume = int(status['volume'])
         self.repeat = bool(int(status['repeat']))
         self.random = bool(int(status['random']))
@@ -54,7 +54,34 @@ class MPDTrack:
         self.bitrate = int(status['bitrate'])
         self.format = status['audio']
 
+        self.file = current['file']
+        self.artist = current['artist']
+        self.album_artist = current['albumartist']
+        self.title = current['title']
+        self.album = current['album']
+        self.track = current['track']
+        self.date = current['date']
+        self.genre = current['genre']
+        self.name = current['name']
+        self.pos = int(current['pos'])
+        self.id = int(current['id'])
+
     def __eq__(self, other):
         return all(getattr(self, x) == getattr(other, x)
                    for x in ['volume',
-                             'song_id'])
+                             'file',
+                             'artist',
+                             'album',
+                             'title',
+                             'name'])
+
+    def __ne__(self, other):
+        return not (self == other)
+
+    def __str__(self):
+        return '[{name}:{volume}%] {artist} — {title}'.format(
+            name=self.name,
+            volume=self.volume,
+            artist=self.artist,
+            title=self.title
+        )
