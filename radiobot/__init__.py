@@ -11,8 +11,8 @@ def main():
                       config['IRC']['channel'],
                       config['NickServ']['password'],
                       mpd_client,
-                      nickserv_nick=config['NickServ'].get('nickname'),
-                      ssl=config['IRC']['tls'])
+                      nickserv_nick=config['NickServ']['nickname'] or None,
+                      ssl=config['IRC'].getboolean('tls'))
     bot.start()
 
 
