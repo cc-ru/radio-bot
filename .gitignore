@@ -3,3 +3,4 @@ env/
 *.egg-info
 *.swp
 *.swo
+radio-bot.cfg
