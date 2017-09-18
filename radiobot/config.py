@@ -9,7 +9,7 @@ logger = getLogger(__name__)
 config = ConfigParser(interpolation=None)
 read_success = not not config.read('radio-bot.cfg')
 
-for section in {'IRC', 'NickServ', 'mpd',
+for section in {'IRC', 'NickServ', 'mpd', 'poll',
                 'loggers', 'handlers', 'formatters',
                 'logger_root', 'logger_irc', 'logger_config', 'logger_mpd',
                 'handler_console',
@@ -30,6 +30,8 @@ config['NickServ'].setdefault('nickname', '')
 config['mpd'].setdefault('hostname', '127.0.0.1')
 config['mpd'].setdefault('port', '6600')
 config['mpd'].setdefault('timeout', '')
+
+config['poll'].setdefault('poll time', '30')
 
 config['loggers'].setdefault('keys', 'root,config,mpd,irc')
 config['handlers'].setdefault('keys', 'console')

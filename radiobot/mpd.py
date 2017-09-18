@@ -133,6 +133,6 @@ class MPDTrack(Mapping):
 
     def __repr__(self):
         return 'MPDTrack<' + ', '.join(
-            x + '=' + str(getattr(self, x))
+            x + '=' + repr(getattr(self, x))
             for x in self.attributes
         ) + '>'

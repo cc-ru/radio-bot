@@ -5,9 +5,14 @@ from logging import getLogger
 from irc.bot import SingleServerIRCBot, ExponentialBackoff
 from irc.connection import Factory
 
+from radiobot.config import config
 from radiobot.mpd import MPDTrack
 
 logger = getLogger(__name__)
+
+
+def get_nick(event):
+    return event.source.split('!', 1)[0]
 
 
 class IRCRadioBot(SingleServerIRCBot):
@@ -28,6 +33,10 @@ class IRCRadioBot(SingleServerIRCBot):
             super().__init__([server], nickname, realname,
                              recon=self.strategy)
         self.channel = channel
+        self.votes = 0
+        self.voters = {}
+        self.poll_remaining = -1
+        self.poll_time = config['poll'].getint('poll time')
         self.previous_track = None
         self.previous_topic = None
         self.admins = admins
@@ -40,6 +49,10 @@ class IRCRadioBot(SingleServerIRCBot):
     def start(self):
         logger.info('Starting bot...')
         super().start()
+
+    def reply(self, connection, event, msg):
+        connection.privmsg(self.channel,
+                           get_nick(event) + ': ' + msg)
 
     def on_welcome(self, connection, event):
         logger.info('Connected to the IRC server.')
@@ -58,23 +71,69 @@ class IRCRadioBot(SingleServerIRCBot):
         with self.mpd as mpd:
             return MPDTrack(mpd.status(), mpd.currentsong())
 
+    def reset_poll(self):
+        self.votes = 0
+        self.poll_remaining = -1
+        self.voters = {}
+
+    def update_poll(self, connection):
+        if self.poll_remaining < 0:
+            return
+
+        self.poll_remaining -= 1
+        if self.poll_remaining < 0:
+            connection.privmsg(self.channel,
+                               '\x02Poll closed.')
+            if self.votes < 0:
+                connection.privmsg(self.channel,
+                                   'The current track is going to be '
+                                   '\x02skipped\x02.')
+                with self.mpd as mpd:
+                    mpd.next()
+                self.update(connection)
+            else:
+                connection.privmsg(self.channel,
+                                   'The current track is going to \x02continue '
+                                   'playing\x02.')
+            self.votes = 0
+
     def update(self, connection):
         current_track = self.get_current_track()
+        self.update_poll(connection)
+
+        if current_track.state == 'play':
+            color_off = '\x0f'
+            if self.votes > 0:
+                color_on = '\x0303'
+            elif self.votes < 0:
+                color_on = '\x0305'
+            else:
+                color_on = ''
+                color_off = ''
+
+            topic = ('\x02Playing:\x02 '
+                     '[{color_on}{votes}{color_off}] '
+                     '{current_track!s}').format(
+                         color_on=color_on,
+                         votes=self.votes,
+                         color_off=color_off,
+                         current_track=current_track
+                     )
+        elif current_track.state == 'stop':
+            topic = '\x02Radio offline'
+
+        if topic != self.previous_topic:
+            logger.debug('updated topic: old=%r, new=%r',
+                         self.previous_topic,
+                         topic)
+            connection.topic(self.channel, topic)
+            self.previous_topic = topic
 
         if current_track != self.previous_track:
             logger.debug('updated track: old=%r, new=%r',
                          self.previous_track,
                          current_track)
-            if current_track.state == 'play':
-                topic = '\x02Playing:\x02 ' + str(current_track)
-            elif current_track.state == 'stop':
-                topic = '\x02Radio offline'
-            if topic != self.previous_topic:
-                logger.debug('updated topic: old=%r, new=%r',
-                             self.previous_topic,
-                             topic)
-                connection.topic(self.channel, topic)
-                self.previous_topic = topic
+            self.reset_poll()
 
             if current_track.state == 'play':
                 connection.privmsg(
@@ -135,3 +194,37 @@ class IRCRadioBot(SingleServerIRCBot):
                     self.channel,
                     '\x02Radio is stopped.'
                 )
+        elif msg == '#rip' or self.poll_remaining > -1 and msg == '#unrip':
+            if self.previous_track.state == 'stop':
+                connection.privmsg(self.channel,
+                                   '\x02Radio is stopped\x02.')
+                return
+
+            if event.source in self.voters:
+                if self.voters[event.source] == msg:
+                    self.reply(connection, event,
+                               '\x02You have already voted\x02.')
+                    return
+                else:
+                    self.votes += (-1 if self.voters[event.source] == '#unrip'
+                                   else 1)
+
+            if msg == '#rip':
+                self.votes -= 1
+            else:
+                self.votes += 1
+
+            self.voters[event.source] = msg
+
+            if self.poll_remaining == -1:
+                connection.privmsg(self.channel,
+                                   '\x02Song skip requested!\x02 '
+                                   'You have \x02{poll_time} seconds\x02 to '
+                                   'cast you vote. Use commands '
+                                   '\x1f#unrip\x1f and \x1f#rip\x1f to '
+                                   'vote!'.format(poll_time=self.poll_time))
+                self.poll_remaining = self.poll_time
+
+            self.reply(connection, event,
+                       '\x02Your vote has been saved.\x02')
+            self.update(connection)
